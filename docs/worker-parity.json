@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "description": "原版自托管与 Cloudflare Workers 的行为映射。null 表示该运行形态没有对应项。路由方法指显式 API 契约，不含框架自动处理的方法。",
+  "routes": [
+    { "methods": ["GET"], "local": "/api/health/live", "worker": "/api/health/live", "workerSource": "worker/src/routes/health.ts", "difference": "服务标识为 subboost-worker。" },
+    { "methods": ["GET"], "local": "/api/health/ready", "worker": "/api/health/ready", "workerSource": "worker/src/routes/health.ts", "difference": "校验密钥与当前全部迁移所需的 D1 表，未就绪返回 503。" },
+    { "methods": ["POST"], "local": "/api/setup/admin", "worker": "/api/setup/admin", "workerSource": "worker/src/routes/auth.ts", "difference": "初始化令牌可选；D1 唯一约束，重复初始化返回 409。" },
+    { "methods": ["POST"], "local": "/api/auth/login", "worker": "/api/auth/login", "workerSource": "worker/src/routes/auth.ts", "difference": "Web Crypto PBKDF2；D1 IP 限流。" },
+    { "methods": ["POST"], "local": "/api/auth/logout", "worker": "/api/auth/logout", "workerSource": "worker/src/routes/auth.ts", "difference": "D1 持久化吊销会话。" },
+    { "methods": ["GET"], "local": "/api/auth/me", "worker": "/api/auth/me", "workerSource": "worker/src/routes/auth.ts", "difference": "包含是否需要初始化令牌，以及缺密钥配置状态。" },
+    { "methods": ["POST"], "local": "/api/source-import", "worker": "/api/source-import", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "边缘 fetch，不支持局域网源；逐跳 URL 校验与流式响应预算。" },
+    { "methods": ["GET", "PATCH"], "local": "/api/settings/source-import", "worker": "/api/settings/source-import", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "保留账户设置，但不能解除边缘网络限制。" },
+    { "methods": ["GET", "POST"], "local": "/api/subscriptions", "worker": "/api/subscriptions", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "D1 保存加密订阅。" },
+    { "methods": ["GET", "PUT", "DELETE"], "local": "/api/subscriptions/:id", "worker": "/api/subscriptions/:id", "workerSource": "worker/src/routes/subscriptions.ts" },
+    { "methods": ["POST"], "local": "/api/subscriptions/:id/refresh", "worker": "/api/subscriptions/:id/refresh", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "使用边缘抓取预算。202 SUBSCRIPTION_REFRESH_PENDING 返回 continuation，使用同一 POST 的 X-SubBoost-Refresh-Continuation 请求头接续；终态保留原有 200 和失败语义，过期、已消费、版本不匹配的令牌返回 409。" },
+    { "methods": ["POST"], "local": "/api/subscriptions/:id/reset-link", "worker": "/api/subscriptions/:id/reset-link", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "保留 If-Match 契约，D1 revision 提供并发写入保护。" },
+    { "methods": ["GET"], "local": "/api/subscriptions/:id/config.yaml", "worker": "/api/subscriptions/:token/config.yaml", "workerSource": "worker/src/routes/subscriptions.ts", "difference": "原版的 :id 实际也是公开令牌；Worker 公开拉取做 isolate 内存尽力限流，不写 D1 访问计数。" },
+    { "methods": ["GET", "POST", "DELETE"], "local": "/api/templates", "worker": "/api/templates", "workerSource": "worker/src/routes/templates.ts", "difference": "上传请求保持 4 MiB 上限；验证后另按 v2 密文及元数据整行检查 2,000,000 字节，超出时返回 413 PAYLOAD_TOO_LARGE。" },
+    { "methods": ["GET"], "local": "/api/templates/:id", "worker": "/api/templates/:id", "workerSource": "worker/src/routes/templates.ts", "difference": "内置详情可公开读取，自定义模板加密并受管理员认证保护。" },
+    { "methods": ["GET"], "local": "/api/rules/search", "worker": "/api/rules/search", "workerSource": "worker/src/routes/rules.ts", "difference": "规则索引快照放入 D1。" },
+    { "methods": ["GET"], "local": "/api/rules/cn-candidates", "worker": "/api/rules/cn-candidates", "workerSource": "worker/src/routes/rules.ts", "difference": "重用 D1 规则索引。" },
+    { "methods": ["POST"], "local": "/api/rules/detect", "worker": "/api/rules/detect", "workerSource": "worker/src/routes/rules.ts", "difference": "管理员认证、边缘抓取和 isolate 内存尽力限流。" },
+    { "methods": ["POST"], "local": "/api/cron/update-subscriptions", "worker": "/api/cron/update-subscriptions", "workerSource": "worker/src/routes/cron.ts", "difference": "HTTP 要求 CRON_SECRET；另由原生 Cron 分批触发。" },
+    { "methods": ["POST"], "local": "/api/cron/update-rule-index", "worker": "/api/cron/update-rule-index", "workerSource": "worker/src/routes/cron.ts", "difference": "HTTP 要求 CRON_SECRET；另由原生 Cron 触发并持久化快照。" },
+    { "methods": ["GET"], "local": "/api/releases/latest", "worker": "/api/releases/latest", "workerSource": "worker/src/routes/releases.ts", "difference": "构建时注入版本，可用 RELEASE_REPO 指定检查目标。" }
+  ],
+  "pages": [
+    { "path": "/", "local": "local/app/page.tsx", "worker": "worker/web/main.tsx", "mode": "reuse", "difference": "沿用转换器，Worker 外层补充密钥缺失提示。" },
+    { "path": "/dashboard", "local": "local/app/dashboard/page.tsx", "worker": "worker/web/dashboard.tsx", "mode": "adapt", "difference": "通过原版 SubscriptionDashboardSurface 接续明确的 Worker pending 响应。" },
+    { "path": "/templates", "local": "local/app/templates/page.tsx", "worker": "worker/web/main.tsx", "mode": "reuse" },
+    { "path": "/login", "local": "local/app/login/page.tsx", "worker": "worker/web/login.tsx", "mode": "adapt", "difference": "适配可选令牌和配置缺失状态。" },
+    { "path": "/dashboard/settings", "local": "local/app/dashboard/settings/page.tsx", "worker": "worker/web/settings.tsx", "mode": "adapt", "difference": "提示 Cloudflare 无法访问局域网；显示当前站点地址。" }
+  ],
+  "shims": [
+    { "module": "next/link", "worker": "worker/web/shims/link.tsx", "exports": ["default"], "difference": "站内 SPA 跳转；下载仍走浏览器原生链接。" },
+    { "module": "next/image", "worker": "worker/web/shims/image.tsx", "exports": ["default"], "difference": "原生 img 与静态资源，不使用 Next 图片优化。" },
+    { "module": "next/navigation", "worker": "worker/web/shims/navigation.ts", "exports": ["usePathname", "useSearchParams", "useRouter"], "difference": "React Router；useRouter 仅支持 push 和 replace。" }
+  ],
+  "environment": [
+    { "name": "ENCRYPTION_KEY", "local": "required", "worker": "required", "kind": "secret", "difference": "Worker 唯一必填值，运行时缺失会报告配置错误。" },
+    { "name": "JWT_SECRET", "local": "required", "worker": "optional", "kind": "secret", "difference": "Worker 默认从 ENCRYPTION_KEY 派生。" },
+    { "name": "LOCAL_SETUP_TOKEN", "local": "required-for-setup", "worker": "optional", "kind": "secret", "difference": "Worker 只在显式配置时要求提交令牌。" },
+    { "name": "CRON_SECRET", "local": "required-for-scheduler", "worker": "optional", "kind": "secret", "difference": "Worker 仅用于 HTTP Cron；原生 Cron 不用。" },
+    { "name": "APP_URL", "local": "optional", "worker": "optional", "kind": "variable", "difference": "Worker 默认使用请求 URL，不信任 Origin 或转发请求头。" },
+    { "name": "CRON_BATCH_SIZE", "local": null, "worker": "optional", "kind": "variable", "default": 3, "min": 1, "max": 5, "difference": "超过上限按上限计算，小于下限或无效时回退默认。" },
+    { "name": "CRON_FETCH_LIMIT", "local": null, "worker": "optional", "kind": "variable", "default": 50, "min": 20, "max": 50, "difference": "超过上限按上限计算，小于下限或无效时回退默认。" },
+    { "name": "RELEASE_REPO", "local": null, "worker": "optional", "kind": "variable", "default": "SubBoost/subboost" },
+    { "name": "DB", "local": null, "worker": "required", "kind": "d1-binding", "difference": "平台注入，不是用户需要填写的环境变量。" },
+    { "name": "DATABASE_URL", "local": "required", "worker": null, "kind": "variable", "difference": "原版连接 PostgreSQL；Worker 使用 DB 绑定。" },
+    { "name": "TRUST_PROXY_HEADERS", "local": "optional", "worker": null, "kind": "variable", "difference": "Worker 读取 CF-Connecting-IP，不使用通用代理头。" },
+    { "name": "ALLOW_UNAUTHENTICATED_CRON", "local": "non-production-only", "worker": null, "kind": "variable" },
+    { "name": "GITHUB_TOKEN", "local": "optional", "worker": null, "kind": "secret", "difference": "原版可选的规则索引请求凭证。" },
+    { "name": "NODE_ENV", "local": "runtime-provided", "worker": null, "kind": "variable", "difference": "原版 Next.js 运行模式；Worker 不据此放行 HTTP Cron。" },
+    { "name": "APP_RELEASE_VERSION", "local": "optional", "worker": null, "kind": "build-metadata", "difference": "Worker 使用根 package.json 版本。" },
+    { "name": "APP_BUILD_SHA", "local": "optional", "worker": null, "kind": "build-metadata" },
+    { "name": "APP_VERSION", "local": "optional", "worker": null, "kind": "build-metadata" },
+    { "name": "APP_VERSION_TOKEN", "local": "optional", "worker": null, "kind": "build-metadata" },
+    { "name": "GITHUB_SHA", "local": "optional", "worker": null, "kind": "build-metadata" },
+    { "name": "VERCEL_GIT_COMMIT_SHA", "local": "optional", "worker": null, "kind": "build-metadata" },
+    { "name": "POSTGRES_DB", "local": "optional", "worker": null, "kind": "compose" },
+    { "name": "POSTGRES_USER", "local": "optional", "worker": null, "kind": "compose" },
+    { "name": "POSTGRES_PASSWORD", "local": "required", "worker": null, "kind": "compose" },
+    { "name": "SUBBOOST_PORT", "local": "optional", "worker": null, "kind": "compose" },
+    { "name": "SUBBOOST_BIND_ADDRESS", "local": "optional", "worker": null, "kind": "compose" },
+    { "name": "SUBBOOST_IMAGE", "local": "required-for-image-compose", "worker": null, "kind": "compose" }
+  ],
+  "database": {
+    "localSchema": "local/prisma/schema.prisma",
+    "workerMigrations": ["worker/migrations/0001_initial.sql", "worker/migrations/0002_subscription_cron.sql", "worker/migrations/0003_manual_refresh.sql"],
+    "difference": "语义对齐而非跨库导入规范。SQLite 布尔使用 0/1，时间戳使用 Unix 毫秒 INTEGER。",
+    "tables": [
+      { "local": "LocalAdmin", "worker": "LocalAdmin", "difference": "SQLite 唯一索引强制单管理员；PBKDF2 哈希替代 bcrypt。" },
+      { "local": "LocalTemplate", "worker": "LocalTemplate", "difference": "加密正文与管理员外键。" },
+      { "local": "Subscription", "worker": "Subscription", "difference": "保留加密字段和唯一令牌，增加 revision；0002 增加 Cron 扫描索引。" },
+      { "local": "SubscriptionAutoUpdateState", "worker": "SubscriptionAutoUpdateState", "difference": "失败计数与停用状态；订阅删除时级联。" },
+      { "local": "JobLeaseLock", "worker": "JobLeaseLock", "difference": "使用 SQLite 条件写入和 RETURNING 原子抢锁。" },
+      { "local": "RevokedSession", "worker": "RevokedSession", "difference": "吊销记录由原生订阅 Cron 有界清理。" },
+      { "local": null, "worker": "RuleIndexCache", "difference": "Worker 持久化规则索引快照。" },
+      { "local": null, "worker": "AuthRateLimit", "difference": "Worker 登录和初始化持久限流，原版无对应数据库表。" },
+      { "local": null, "worker": "SubscriptionCronSweep", "difference": "0002：记录订阅 Cron 的公平扫描游标。" },
+      { "local": null, "worker": "SubscriptionCronProgress", "difference": "0002：按订阅 revision 分片保存加密阶段进度和容量冷却。" },
+      { "local": null, "worker": "SubscriptionManualRefreshProgress", "difference": "0003：按订阅 revision 隔离保存短期手动刷新检查点，和 Cron 阶段进度不混用。" }
+    ]
+  },
+  "schedules": [
+    { "cron": "*/6 * * * *", "localTrigger": "POST /api/cron/update-subscriptions", "workerTrigger": "scheduled", "workerSource": "worker/src/routes/cron.ts" },
+    { "cron": "0 */6 * * *", "localTrigger": "POST /api/cron/update-rule-index", "workerTrigger": "scheduled", "workerSource": "worker/src/routes/cron.ts" }
+  ]
+}

@@ -1,0 +1,18 @@
+// 单独校验浏览器代码，避免给 Worker 后端全局引入 DOM 类型。
+{
+  "extends": "../local/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "incremental": false,
+    "plugins": [],
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@local/*": ["../local/src/*"],
+      "@subboost/ui/*": ["../packages/ui/src/*"],
+      "next/link": ["./web/shims/link.tsx"],
+      "next/image": ["./web/shims/image.tsx"],
+      "next/navigation": ["./web/shims/navigation.ts"]
+    }
+  },
+  "include": ["web/**/*.ts", "web/**/*.tsx", "vite.config.ts"]
+}

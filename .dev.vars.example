@@ -1,0 +1,2 @@
+# Cloudflare 部署和本地开发共用的必填密钥示例。用 openssl rand -hex 32 生成自己的值。
+ENCRYPTION_KEY=

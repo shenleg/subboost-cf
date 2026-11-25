@@ -1,0 +1,107 @@
+{
+  "name": "subboost-cf",
+  "version": "2.12.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "engines": {
+    "node": ">=24.22.1 <25 || >=26.12.1 <27"
+  },
+  "workspaces": [
+    "packages/*",
+    "local",
+    "worker"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @subboost/local run dev",
+    "build": "npm --workspace @subboost/worker run build",
+    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "worker:dev": "npm run build && wrangler d1 migrations apply DB --local && wrangler dev",
+    "worker:dry-run": "node worker/scripts/check-bundle.mjs",
+    "worker:test": "npm --workspace @subboost/worker run test",
+    "worker:typecheck": "npm --workspace @subboost/worker run typecheck",
+    "check:worker": "npm run worker:typecheck && npm run worker:test && npm run build && npm --workspace @subboost/worker run test:spa:built && npm run worker:dry-run && npm run local:db:generate && vitest run --config vitest.coverage.ts",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --config vitest.coverage.ts --coverage",
+    "test:core": "vitest run --config vitest.core.config.ts",
+    "lint": "eslint local packages --max-warnings=0 && npm run check:ui-consistency",
+    "check:ui-consistency": "node scripts/check-ui-consistency.cjs packages local",
+    "check:local-app": "npm --prefix local run check",
+    "local:db:generate": "npm --prefix local run db:generate",
+    "local:lint": "npm --prefix local run lint",
+    "local:typecheck": "npm --prefix local run typecheck",
+    "local:build": "npm --prefix local run build"
+  },
+  "cloudflare": {
+    "bindings": {
+      "ENCRYPTION_KEY": {
+        "description": "唯一必填密钥。用 openssl rand -hex 32 生成随机值，部署后请妥善保管，不要提交到 Git。"
+      }
+    }
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "@radix-ui/react-avatar": "^1.3.1",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-popover": "^1.3.1",
+    "@radix-ui/react-scroll-area": "^1.4.0",
+    "@radix-ui/react-select": "^2.4.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-toast": "^1.3.1",
+    "@subboost/config": "file:packages/config",
+    "@subboost/core": "file:packages/core",
+    "@subboost/server-core": "file:packages/server-core",
+    "@subboost/ui": "file:packages/ui",
+    "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^18.0.8",
+    "jose": "^6.2.13",
+    "js-yaml": "^5.5.0",
+    "lucide-react": "^1.61.0",
+    "next": "^16.4.6",
+    "peggy": "^5.1.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-remove-scroll-bar": "^2.3.8",
+    "qrcode.react": "^4.2.0",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^10.15.0",
+    "eslint-config-next": "^16.4.6",
+    "postcss": "8.5.31",
+    "prisma": "^7.10.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5",
+    "vite": "^8.3.5"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "effect": "3.22.1",
+    "find-my-way": "9.10.0",
+    "mysql2": "3.24.6",
+    "nanoid": "3.3.20",
+    "postcss": "8.5.31",
+    "sharp": "0.35.5",
+    "valibot": "1.5.0"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "esbuild@0.28.2": false,
+    "prisma@7.10.1": true,
+    "unrs-resolver@1.12.2": true,
+    "workerd@1.20261123.1": false
+  }
+}

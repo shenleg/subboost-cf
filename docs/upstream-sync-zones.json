@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "description": "上游同步区域、合并策略和验证入口。路径均为仓库根相对路径。",
+  "upstream": "https://github.com/SubBoost/subboost.git",
+  "parityMap": "docs/worker-parity.json",
+  "matching": "按下列规则的顺序取首个匹配。exact 精确匹配；prefix 匹配路径开头并含目录尾斜杠。未匹配归入 shared。重命名必须分别分类新旧路径。",
+  "zones": {
+    "upstream-readonly": "采用上游内容，不在该区做 Worker 专属改动；跨运行时差异在 Worker 区适配。",
+    "worker-owned": "保留 Fork 实现；如上游也新增同名路径则转人工裁决。",
+    "shared": "按各文件的合并策略处理；无明确策略的变更转人工审阅。"
+  },
+  "rules": [
+    { "zone": "upstream-readonly", "prefix": ["local/", "packages/", ".github/", "test/", "scripts/recovery/", "docs/assets/"] },
+    { "zone": "upstream-readonly", "exact": ["LICENSE", "docs/THIRD_PARTY_NOTICES.md", "docs/CONTRIBUTING.md", "docs/release-notes.md", "scripts/check-ui-consistency.cjs", "scripts/selfhost-release-assets.cjs", ".dockerignore"] },
+    { "zone": "worker-owned", "prefix": ["worker/"] },
+    { "zone": "worker-owned", "exact": ["wrangler.jsonc", ".dev.vars.example", "docs/cloudflare-workers.md", "docs/upstream-sync-guide.md", "docs/upstream-sync-zones.json", "docs/worker-parity.json"] },
+    { "zone": "shared", "exact": ["package.json", "package-lock.json", ".gitignore", "README.md", "README-CN.md", "tsconfig.json", "eslint.config.mjs", ".gitattributes", "vitest.config.ts", "vitest.core.config.ts", "vitest.coverage.ts"] }
+  ],
+  "defaultZone": "shared",
+  "sharedFiles": {
+    "package.json": { "strategy": "采用上游依赖、版本和原版命令，重放 Worker 设置；出现不兼容版本或命令冲突转人工。", "preserve": ["workspaces 中的 worker", "scripts.build 指向 Worker", "scripts.deploy 按 DB 执行远端迁移后部署", "scripts.worker:dev 在 Wrangler dev 前执行本地迁移", "scripts.worker:dry-run 仅干跑并检查体积", "scripts.worker:test", "scripts.worker:typecheck", "scripts.check:worker", "scripts.local:build", "cloudflare.bindings.ENCRYPTION_KEY", "Wrangler 与 Worker 运行所需的 allowScripts 设置"] },
+    "package-lock.json": { "strategy": "以合并后的包清单用 npm 重算；不得逐块选择冲突内容；最终用 npm ci 复验。" },
+    ".gitignore": { "strategy": "保留上游规则及 .wrangler/、.dev.vars 和 .dev.vars.* 忽略规则；保留 !.dev.vars.example 例外。" },
+    "README.md": { "strategy": "使用最新上游正文，仅在头部重放 Workers 部署横幅，不改上游许可及源码链接。" },
+    "README-CN.md": { "strategy": "使用最新上游正文，仅在头部重放 Workers 部署横幅，不改上游许可及源码链接。" }
+  },
+  "validation": {
+    "install": "npm ci",
+    "required": ["npm run check:worker"],
+    "bundle": { "metric": "wrangler_total_upload_gzip_bytes", "exclusiveMax": 3000000 },
+    "cloudflareWritesAllowed": false
+  }
+}

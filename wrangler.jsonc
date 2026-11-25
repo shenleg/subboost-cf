@@ -1,0 +1,25 @@
+// Worker CLI 入口，托管 Vite 产物并仅将 API 请求交给 Hono。
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "subboost-cf",
+  "main": "worker/src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "worker/dist",
+    "not_found_handling": "single-page-application",
+    // 浏览器直接打开公开订阅或健康检查时，也必须得到 API 响应而不是 SPA。
+    "run_worker_first": ["/api", "/api/*"]
+  },
+  // 高频处理到期订阅，低频刷新规则索引，分开使用每次调用的预算。
+  "triggers": { "crons": ["*/6 * * * *", "0 */6 * * *"] },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "subboost_d1",
+      // 全零 UUID 仅用于模板：部署按钮自动替换；CLI 远端部署前手动填入新建库 ID。
+      "database_id": "bc99b846-646f-443b-ae43-30ba911a8353",
+      "migrations_dir": "worker/migrations"
+    }
+  ]
+}
